@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Grid3X3, Users, BookOpen, Quote, Network, Menu, X } from "lucide-react";
+import { MessageSquare, Grid3X3, Users, BookOpen, Quote, Menu, X } from "lucide-react";
 import { useState } from "react";
 
 const navigation = [
@@ -12,7 +12,6 @@ const navigation = [
   { name: "Guests", href: "/guests", icon: Users },
   { name: "Books", href: "/books", icon: BookOpen },
   { name: "Quotes", href: "/quotes", icon: Quote },
-  { name: "Graph", href: "/graph", icon: Network },
 ];
 
 export function Header() {
