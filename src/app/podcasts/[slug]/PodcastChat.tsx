@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -15,19 +16,11 @@ interface PodcastChatProps {
   episodeTitle: string;
 }
 
-export function PodcastChat({ episodeId, episodeTitle }: PodcastChatProps) {
+export function PodcastChat({ episodeId }: PodcastChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +30,11 @@ export function PodcastChat({ episodeId, episodeTitle }: PodcastChatProps) {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
+
+    // Scroll to bottom once when sending message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
 
     try {
       const response = await fetch("/api/chat", {
@@ -64,13 +62,23 @@ export function PodcastChat({ episodeId, episodeTitle }: PodcastChatProps) {
         if (done) break;
 
         const chunk = decoder.decode(value);
-        assistantMessage += chunk;
+
+        // Handle the __SOURCES__ marker - strip it out for episode chat
+        if (chunk.includes("__SOURCES__")) {
+          const parts = chunk.split("__SOURCES__");
+          assistantMessage += parts[0];
+        } else if (!assistantMessage.includes("__SOURCES__")) {
+          assistantMessage += chunk;
+        }
+
+        // Clean any sources from the displayed message
+        const displayContent = assistantMessage.split("__SOURCES__")[0];
 
         setMessages((prev) => {
           const newMessages = [...prev];
           newMessages[newMessages.length - 1] = {
             role: "assistant",
-            content: assistantMessage,
+            content: displayContent,
           };
           return newMessages;
         });
@@ -105,14 +113,20 @@ export function PodcastChat({ episodeId, episodeTitle }: PodcastChatProps) {
         {messages.map((message, i) => (
           <div
             key={i}
-            className={`text-sm ${
+            className={
               message.role === "user"
-                ? "bg-foreground text-background p-3 rounded-lg ml-4"
-                : "text-foreground/90"
-            }`}
+                ? "bg-accent text-white p-3 rounded-lg ml-4 text-sm"
+                : ""
+            }
           >
-            {message.content || (
-              <span className="flex items-center gap-2 text-muted">
+            {message.role === "user" ? (
+              message.content
+            ) : message.content ? (
+              <div className="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-strong:text-foreground">
+                <ReactMarkdown>{message.content}</ReactMarkdown>
+              </div>
+            ) : (
+              <span className="flex items-center gap-2 text-muted text-sm">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Thinking...
               </span>

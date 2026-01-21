@@ -8,6 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate, formatDuration } from "@/lib/utils";
 import { Mic, Calendar, Clock, Quote } from "lucide-react";
 
+// Strip markdown for clean text excerpts on cards
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, "$1") // bold
+    .replace(/\*([^*]+)\*/g, "$1") // italic
+    .replace(/^[-*]\s+/gm, "") // list items
+    .replace(/\n+/g, " ") // newlines to spaces
+    .trim();
+}
+
 interface Guest {
   id: string;
   name: string;
@@ -133,7 +143,7 @@ export default async function GuestPage({
                     </div>
                     {episode.summary && (
                       <p className="text-sm text-muted line-clamp-2">
-                        {episode.summary}
+                        {stripMarkdown(episode.summary)}
                       </p>
                     )}
                   </CardContent>

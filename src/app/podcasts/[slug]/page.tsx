@@ -6,10 +6,11 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDuration, formatDate } from "@/lib/utils";
+import { formatDuration, formatDate, slugify } from "@/lib/utils";
 import { ExternalLink, Calendar, Clock, Eye, BookOpen, Lightbulb, Heart, HelpCircle } from "lucide-react";
 import { TranscriptViewer } from "./TranscriptViewer";
 import { PodcastChat } from "./PodcastChat";
+import ReactMarkdown from "react-markdown";
 
 interface Episode {
   id: string;
@@ -111,7 +112,7 @@ export default async function PodcastPage({
         <h1 className="text-3xl font-bold mb-3">{episode.title}</h1>
         <div className="flex flex-wrap items-center gap-4 text-sm text-muted mb-4">
           <Link
-            href={`/guests/${episode.guest_name.toLowerCase().replace(/\s+/g, "-")}`}
+            href={`/guests/${slugify(episode.guest_name)}`}
             className="font-medium text-foreground hover:underline"
           >
             {episode.guest_name}
@@ -228,10 +229,8 @@ export default async function PodcastPage({
                 <CardTitle>Summary</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="prose prose-sm max-w-none">
-                  {episode.summary.split("\n").map((paragraph, i) => (
-                    <p key={i}>{paragraph}</p>
-                  ))}
+                <div className="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-foreground">
+                  <ReactMarkdown>{episode.summary}</ReactMarkdown>
                 </div>
               </CardContent>
             </Card>

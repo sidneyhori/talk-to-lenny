@@ -9,6 +9,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PodcastFilters } from "./PodcastFilters";
 import { formatDuration, formatDate } from "@/lib/utils";
 
+// Strip markdown for clean text excerpts on cards
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, "$1") // bold
+    .replace(/\*([^*]+)\*/g, "$1") // italic
+    .replace(/^[-*]\s+/gm, "") // list items
+    .replace(/\n+/g, " ") // newlines to spaces
+    .trim();
+}
+
 interface SearchParams {
   q?: string;
   guest?: string;
@@ -107,7 +117,7 @@ function EpisodeCard({ episode }: { episode: {
         <CardContent>
           <p className="text-sm font-medium mb-2">{episode.guest_name}</p>
           {episode.summary && (
-            <p className="text-sm text-muted line-clamp-2 mb-3">{episode.summary}</p>
+            <p className="text-sm text-muted line-clamp-2 mb-3">{stripMarkdown(episode.summary)}</p>
           )}
           <div className="flex items-center gap-3 text-sm text-muted mb-3">
             <span>{formatDate(episode.publish_date)}</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ interface Message {
 }
 
 const EXAMPLE_QUESTIONS = [
-  "What does Brian Chesky say about hiring?",
+  "What does Brian Chesky say about product design?",
   "How do top PMs prioritize their roadmap?",
   "What advice do guests give about founder-market fit?",
   "What books are most recommended on the podcast?",
@@ -35,14 +35,6 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
@@ -51,6 +43,11 @@ export default function ChatPage() {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
+
+    // Scroll to bottom once when sending message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
 
     try {
       const response = await fetch("/api/chat", {
@@ -152,112 +149,113 @@ export default function ChatPage() {
         </p>
       </div>
 
-      {/* Chat messages */}
-      <div className="min-h-[400px] mb-6">
-        {messages.length === 0 && (
-          <div className="text-center py-16">
-            <MessageSquare className="h-12 w-12 mx-auto text-muted mb-4" />
-            <h2 className="text-xl font-medium mb-4">Start a conversation</h2>
-            <p className="text-muted mb-8 max-w-md mx-auto">
-              I can answer questions about product management, growth, leadership,
-              and more based on Lenny&apos;s podcast episodes.
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {EXAMPLE_QUESTIONS.map((question) => (
-                <Button
-                  key={question}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExampleClick(question)}
-                  className="text-sm"
-                >
-                  {question}
-                </Button>
-              ))}
+      {/* Chat container */}
+      <div className="border border-border rounded-lg flex flex-col h-[600px]">
+        {/* Messages area - scrollable */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {messages.length === 0 && (
+            <div className="text-center py-16">
+              <MessageSquare className="h-12 w-12 mx-auto text-muted mb-4" />
+              <h2 className="text-xl font-medium mb-4">Start a conversation</h2>
+              <p className="text-muted mb-8 max-w-md mx-auto">
+                I can answer questions about product management, growth, leadership,
+                and more based on Lenny&apos;s podcast episodes.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {EXAMPLE_QUESTIONS.map((question) => (
+                  <Button
+                    key={question}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExampleClick(question)}
+                    className="text-sm"
+                  >
+                    {question}
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="space-y-6">
-          {messages.map((message, i) => (
-            <div key={i}>
-              {message.role === "user" ? (
-                <div className="flex justify-end">
-                  <div className="bg-foreground text-background p-4 rounded-lg max-w-[80%]">
-                    {message.content}
+          <div className="space-y-6">
+            {messages.map((message, i) => (
+              <div key={i}>
+                {message.role === "user" ? (
+                  <div className="flex justify-end">
+                    <div className="bg-accent text-white p-4 rounded-lg max-w-[80%]">
+                      {message.content}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="prose prose-sm max-w-none">
-                    {message.content ? (
-                      <ReactMarkdown>{message.content}</ReactMarkdown>
-                    ) : (
-                      <span className="flex items-center gap-2 text-muted">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Searching transcripts...
-                      </span>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-1 prose-strong:text-foreground prose-headings:text-foreground">
+                      {message.content ? (
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      ) : (
+                        <span className="flex items-center gap-2 text-muted">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Searching transcripts...
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Sources */}
+                    {message.sources && message.sources.length > 0 && (
+                      <Card>
+                        <CardContent className="pt-4">
+                          <h4 className="text-sm font-medium mb-3">Sources</h4>
+                          <div className="space-y-3">
+                            {message.sources.map((source, j) => (
+                              <div key={j} className="text-sm">
+                                <Link
+                                  href={`/podcasts/${source.episodeSlug}`}
+                                  className="font-medium hover:underline flex items-center gap-1"
+                                >
+                                  {source.episodeTitle}
+                                  <ExternalLink className="h-3 w-3" />
+                                </Link>
+                                {source.timestamp && (
+                                  <span className="text-muted text-xs">
+                                    {" "}
+                                    at {source.timestamp}
+                                  </span>
+                                )}
+                                <p className="text-muted text-xs mt-1 line-clamp-2">
+                                  {source.snippet}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
                     )}
                   </div>
+                )}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
 
-                  {/* Sources */}
-                  {message.sources && message.sources.length > 0 && (
-                    <Card>
-                      <CardContent className="pt-4">
-                        <h4 className="text-sm font-medium mb-3">Sources</h4>
-                        <div className="space-y-3">
-                          {message.sources.map((source, j) => (
-                            <div key={j} className="text-sm">
-                              <Link
-                                href={`/podcasts/${source.episodeSlug}`}
-                                className="font-medium hover:underline flex items-center gap-1"
-                              >
-                                {source.episodeTitle}
-                                <ExternalLink className="h-3 w-3" />
-                              </Link>
-                              {source.timestamp && (
-                                <span className="text-muted text-xs">
-                                  {" "}
-                                  at {source.timestamp}
-                                </span>
-                              )}
-                              <p className="text-muted text-xs mt-1 line-clamp-2">
-                                {source.snippet}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
+        {/* Input - fixed at bottom */}
+        <div className="border-t border-border p-3">
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about product, growth, leadership..."
+              disabled={isLoading}
+            />
+            <Button type="submit" disabled={isLoading || !input.trim()}>
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
               )}
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
+            </Button>
+          </form>
         </div>
       </div>
-
-      {/* Input */}
-      <form
-        onSubmit={handleSubmit}
-        className="sticky bottom-4 bg-background border border-border rounded-lg p-2 flex gap-2"
-      >
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about product, growth, leadership..."
-          disabled={isLoading}
-          className="border-0 focus-visible:ring-0"
-        />
-        <Button type="submit" disabled={isLoading || !input.trim()}>
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-        </Button>
-      </form>
     </div>
   );
 }

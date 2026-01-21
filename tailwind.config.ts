@@ -10,11 +10,13 @@ const config: Config = {
     extend: {
       colors: {
         background: "#ffffff",
-        foreground: "#000000",
+        foreground: "#1a1a1a",
         card: "#fafafa",
         border: "#e5e5e5",
         muted: "#737373",
-        accent: "#0066cc",
+        accent: "#f97316", // Lenny's orange
+        "accent-hover": "#ea580c",
+        "accent-muted": "#fef3e2", // Muted peach/cream
       },
       maxWidth: {
         content: "1400px",
@@ -31,7 +33,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [require("@tailwindcss/typography")],
 };
 
 export default config;

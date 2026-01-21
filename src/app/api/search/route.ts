@@ -1,7 +1,8 @@
 import { createServerClient } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 
-export const runtime = "edge";
+// Use Node.js runtime for better env var and database support
+export const runtime = "nodejs";
 
 interface SearchRequest {
   query: string;
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
       // @ts-expect-error - RPC function types not inferred by Supabase client
       const rpcResult = await supabase.rpc("match_chunks", {
         query_embedding: embedding,
-        match_threshold: 0.65,
+        match_threshold: 0.2, // Lower threshold for better recall
         match_count: limit * 2,
       });
 

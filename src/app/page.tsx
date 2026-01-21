@@ -4,12 +4,13 @@ import Link from "next/link";
 import { MessageSquare, Mic, Users, BookOpen, Quote } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { RotatingQuotes } from "@/components/RotatingQuotes";
 import { supabase } from "@/lib/supabase";
 
 interface FeaturedQuote {
   content: string;
   topic: string | null;
-  episodes: { title: string; guest_name: string; slug: string } | null;
+  guest_name: string | null;
 }
 
 interface RecentEpisode {
@@ -42,36 +43,40 @@ async function getStats() {
   };
 }
 
-async function getFeaturedQuote(): Promise<FeaturedQuote | null> {
+async function getFeaturedQuotes(): Promise<FeaturedQuote[]> {
+  // Get a batch of quotes
   const { data } = await supabase
     .from("quotes")
     .select(
       `
       content,
       topic,
-      episodes(title, guest_name, slug)
+      episodes(guest_name)
     `
     )
-    .eq("is_featured", true)
-    .limit(1)
-    .single();
+    .limit(200);
 
-  if (data) return data as unknown as FeaturedQuote;
+  if (!data || data.length === 0) return [];
 
-  // Fallback to random quote
-  const { data: randomQuote } = await supabase
-    .from("quotes")
-    .select(
-      `
-      content,
-      topic,
-      episodes(title, guest_name, slug)
-    `
-    )
-    .limit(1)
-    .single();
+  // Type the data properly
+  type QuoteRow = {
+    content: string;
+    topic: string | null;
+    episodes: { guest_name: string } | null;
+  };
 
-  return randomQuote as unknown as FeaturedQuote | null;
+  // Filter for quotes between 50-300 chars and shuffle
+  const goodQuotes = (data as QuoteRow[])
+    .filter((q) => q.content.length >= 50 && q.content.length <= 300)
+    .map((q) => ({
+      content: q.content,
+      topic: q.topic,
+      guest_name: q.episodes?.guest_name || null,
+    }))
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 5);
+
+  return goodQuotes;
 }
 
 async function getRecentEpisodes(): Promise<RecentEpisode[]> {
@@ -100,9 +105,9 @@ function formatDate(date: string): string {
 }
 
 export default async function HomePage() {
-  const [stats, featuredQuote, recentEpisodes] = await Promise.all([
+  const [stats, featuredQuotes, recentEpisodes] = await Promise.all([
     getStats(),
-    getFeaturedQuote(),
+    getFeaturedQuotes(),
     getRecentEpisodes(),
   ]);
 
@@ -160,24 +165,10 @@ export default async function HomePage() {
         })}
       </section>
 
-      {/* Featured Quote */}
-      {featuredQuote && (
+      {/* Featured Quotes */}
+      {featuredQuotes.length > 0 && (
         <section className="mb-16">
-          <Card className="bg-foreground text-background">
-            <CardContent className="py-8 px-6 md:px-12">
-              <blockquote className="text-lg md:text-xl italic mb-4">
-                &ldquo;{featuredQuote.content}&rdquo;
-              </blockquote>
-              <div className="flex items-center justify-between">
-                <p className="font-medium">
-                  {featuredQuote.episodes?.guest_name}
-                </p>
-                {featuredQuote.topic && (
-                  <span className="text-sm opacity-75">{featuredQuote.topic}</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <RotatingQuotes quotes={featuredQuotes} />
         </section>
       )}
 

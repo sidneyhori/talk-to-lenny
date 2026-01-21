@@ -137,10 +137,10 @@ a {
 }
 
 .prose a {
-  color: #0066cc;
+  color: #f97316;
   text-decoration: underline;
 }
 
 .prose a:hover {
-  color: #004499;
+  color: #ea580c;
 }
