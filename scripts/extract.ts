@@ -1,82 +1,67 @@
 /**
- * Content Extraction Script
+ * Content Extraction Script (Optimized)
  *
- * Uses GPT-4o to extract:
+ * Uses GPT-4o-mini to extract in parallel:
  * - Lightning round answers (books, favorite product, life motto, etc.)
  * - Notable quotes
  * - Episode summaries
  */
 
+import * as dotenv from "dotenv";
+dotenv.config();
+
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 
 // Initialize clients
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const openaiKey = process.env.OPENAI_API_KEY;
+
+if (!supabaseUrl || !serviceRoleKey || !openaiKey) {
+  console.error("Missing environment variables.");
+  process.exit(1);
+}
+
 const supabase = createClient(supabaseUrl, serviceRoleKey);
+const openai = new OpenAI({ apiKey: openaiKey });
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+// Use faster model
+const MODEL = "gpt-4o-mini";
+const CONCURRENCY = 10; // Process 10 episodes in parallel
 
-interface LightningRoundData {
-  books_recommended: Array<{ title: string; author?: string }>;
-  favorite_product: { name: string; description?: string } | null;
-  life_motto: string | null;
-  interview_question: string | null;
-  failure_lesson: string | null;
+interface ExtractionResult {
+  lightning_round: {
+    books_recommended: Array<{ title: string; author?: string }>;
+    favorite_product: { name: string; description?: string } | null;
+    life_motto: string | null;
+    interview_question: string | null;
+  };
+  quotes: Array<{ content: string; topic: string }>;
+  summary: string;
 }
 
-interface QuoteData {
-  content: string;
-  topic: string;
-  timestamp?: string;
-}
+const COMBINED_PROMPT = `Analyze this podcast transcript and extract the following in JSON format:
 
-const LIGHTNING_ROUND_PROMPT = `Analyze this podcast transcript and extract the Lightning Round answers.
-
-Look for sections where the host asks rapid-fire questions like:
-- What's a book you've recommended most?
-- What's a favorite product you've recently discovered?
-- What's your life motto?
-- What interview question do you like to ask candidates?
-- What's a recent failure and lesson learned?
-
-Return a JSON object with this structure:
 {
-  "books_recommended": [{"title": "Book Title", "author": "Author Name"}],
-  "favorite_product": {"name": "Product", "description": "Why they like it"} or null,
-  "life_motto": "Their motto" or null,
-  "interview_question": "The question" or null,
-  "failure_lesson": "The lesson" or null
+  "lightning_round": {
+    "books_recommended": [{"title": "Book", "author": "Author"}],
+    "favorite_product": {"name": "Product", "description": "Why"} or null,
+    "life_motto": "motto" or null,
+    "interview_question": "question" or null
+  },
+  "quotes": [
+    {"content": "Notable quote from guest", "topic": "brief topic"}
+  ],
+  "summary": "2-3 sentence summary of episode focusing on key insights"
 }
 
-If a category isn't mentioned in the transcript, use null or empty array.
-Only include information explicitly stated in the transcript.`;
+Guidelines:
+- Lightning round: Look for rapid-fire Q&A section (books, products, mottos)
+- Quotes: Extract 2-3 memorable insights from the GUEST only
+- Summary: Brief overview of who the guest is and main takeaways
 
-const QUOTES_PROMPT = `Extract 3-5 notable quotes from this podcast transcript.
-
-Look for:
-- Memorable insights about product management, growth, leadership
-- Surprising or contrarian viewpoints
-- Actionable advice
-- Quotable one-liners
-
-Return a JSON array:
-[
-  {"content": "The exact quote", "topic": "Brief topic like 'hiring' or 'growth'", "timestamp": "if mentioned"}
-]
-
-Only include direct quotes from the guest, not the host.`;
-
-const SUMMARY_PROMPT = `Write a concise 2-3 paragraph summary of this podcast episode.
-
-Focus on:
-- Who the guest is and their background
-- The main topics discussed
-- Key insights and takeaways
-
-Keep it under 200 words and make it engaging for someone deciding whether to listen.`;
+Only include what's explicitly in the transcript. Use null/empty arrays if not found.`;
 
 async function getEpisodesNeedingExtraction(): Promise<
   Array<{
@@ -86,85 +71,51 @@ async function getEpisodesNeedingExtraction(): Promise<
     raw_transcript: string;
   }>
 > {
-  // Get episodes without lightning rounds or summaries
   const { data, error } = await supabase
     .from("episodes")
     .select("id, title, guest_name, raw_transcript")
     .is("summary", null)
-    .limit(10);
+    .limit(50);
 
   if (error) throw error;
   return data || [];
 }
 
-async function extractLightningRound(
-  transcript: string
-): Promise<LightningRoundData | null> {
+async function extractAll(
+  transcript: string,
+  title: string,
+  guestName: string
+): Promise<ExtractionResult | null> {
   try {
+    // Take beginning and end of transcript (lightning round usually at end)
+    const maxLen = 20000;
+    let truncated = transcript;
+    if (transcript.length > maxLen) {
+      const start = transcript.slice(0, maxLen / 2);
+      const end = transcript.slice(-maxLen / 2);
+      truncated = start + "\n\n[...middle truncated...]\n\n" + end;
+    }
+
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: MODEL,
       messages: [
-        { role: "system", content: LIGHTNING_ROUND_PROMPT },
-        { role: "user", content: transcript.slice(-30000) }, // Last ~30k chars more likely to have lightning round
+        { role: "system", content: COMBINED_PROMPT },
+        {
+          role: "user",
+          content: `Episode: ${title}\nGuest: ${guestName}\n\n${truncated}`,
+        },
       ],
       response_format: { type: "json_object" },
       temperature: 0.3,
+      max_tokens: 1000,
     });
 
     const content = response.choices[0].message.content;
     if (!content) return null;
 
-    return JSON.parse(content) as LightningRoundData;
+    return JSON.parse(content) as ExtractionResult;
   } catch (error) {
-    console.error("Error extracting lightning round:", error);
-    return null;
-  }
-}
-
-async function extractQuotes(transcript: string): Promise<QuoteData[]> {
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: QUOTES_PROMPT },
-        { role: "user", content: transcript.slice(0, 50000) }, // First ~50k chars
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.5,
-    });
-
-    const content = response.choices[0].message.content;
-    if (!content) return [];
-
-    const parsed = JSON.parse(content);
-    return Array.isArray(parsed) ? parsed : parsed.quotes || [];
-  } catch (error) {
-    console.error("Error extracting quotes:", error);
-    return [];
-  }
-}
-
-async function generateSummary(
-  transcript: string,
-  guestName: string,
-  title: string
-): Promise<string | null> {
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: SUMMARY_PROMPT },
-        {
-          role: "user",
-          content: `Episode: ${title}\nGuest: ${guestName}\n\nTranscript:\n${transcript.slice(0, 40000)}`,
-        },
-      ],
-      temperature: 0.7,
-    });
-
-    return response.choices[0].message.content;
-  } catch (error) {
-    console.error("Error generating summary:", error);
+    console.error(`Error extracting ${title}:`, (error as Error).message);
     return null;
   }
 }
@@ -174,92 +125,96 @@ async function processEpisode(episode: {
   title: string;
   guest_name: string;
   raw_transcript: string;
-}): Promise<void> {
-  console.log(`Processing: ${episode.title}`);
+}): Promise<boolean> {
+  const result = await extractAll(
+    episode.raw_transcript,
+    episode.title,
+    episode.guest_name
+  );
 
-  // Extract lightning round
-  const lightningRound = await extractLightningRound(episode.raw_transcript);
-  if (lightningRound) {
-    // Check if any lightning round content was found
-    const hasContent =
-      lightningRound.books_recommended.length > 0 ||
-      lightningRound.favorite_product ||
-      lightningRound.life_motto ||
-      lightningRound.interview_question ||
-      lightningRound.failure_lesson;
+  if (!result) return false;
 
-    if (hasContent) {
-      await supabase.from("lightning_rounds").upsert({
-        episode_id: episode.id,
-        books_recommended: lightningRound.books_recommended,
-        favorite_product: lightningRound.favorite_product,
-        life_motto: lightningRound.life_motto,
-        interview_question: lightningRound.interview_question,
-        failure_lesson: lightningRound.failure_lesson,
-      });
+  // Save lightning round
+  const lr = result.lightning_round;
+  if (lr && (lr.books_recommended?.length || lr.favorite_product || lr.life_motto)) {
+    await supabase.from("lightning_rounds").upsert({
+      episode_id: episode.id,
+      books_recommended: lr.books_recommended || [],
+      favorite_product: lr.favorite_product,
+      life_motto: lr.life_motto,
+      interview_question: lr.interview_question,
+    });
 
-      // Also update books table
-      for (const book of lightningRound.books_recommended) {
-        await supabase.from("books").upsert(
-          {
-            title: book.title,
-            author: book.author || null,
-            recommendation_count: 1,
-            recommenders: [episode.guest_name],
-          },
-          {
-            onConflict: "title,author",
-          }
-        );
-      }
+    // Update books table
+    for (const book of lr.books_recommended || []) {
+      await supabase.from("books").upsert(
+        {
+          title: book.title,
+          author: book.author || null,
+          recommendation_count: 1,
+          recommenders: [episode.guest_name],
+        },
+        { onConflict: "title,author" }
+      );
     }
   }
 
-  // Extract quotes
-  const quotes = await extractQuotes(episode.raw_transcript);
-  if (quotes.length > 0) {
-    // Get guest ID
+  // Save quotes
+  if (result.quotes?.length) {
     const { data: guest } = await supabase
       .from("guests")
       .select("id")
       .eq("name", episode.guest_name)
       .single();
 
-    const quoteInserts = quotes.map((q) => ({
-      episode_id: episode.id,
-      guest_id: guest?.id || null,
-      content: q.content,
-      topic: q.topic,
-      timestamp: q.timestamp || null,
-      is_featured: false,
-    }));
-
-    await supabase.from("quotes").insert(quoteInserts);
+    await supabase.from("quotes").insert(
+      result.quotes.map((q) => ({
+        episode_id: episode.id,
+        guest_id: guest?.id || null,
+        content: q.content,
+        topic: q.topic,
+        is_featured: false,
+      }))
+    );
   }
 
-  // Generate summary
-  const summary = await generateSummary(
-    episode.raw_transcript,
-    episode.guest_name,
-    episode.title
-  );
-
-  if (summary) {
+  // Save summary
+  if (result.summary) {
     await supabase
       .from("episodes")
-      .update({ summary })
+      .update({ summary: result.summary })
       .eq("id", episode.id);
   }
 
-  console.log(
-    `  - Lightning round: ${lightningRound ? "Yes" : "No"}, Quotes: ${quotes.length}, Summary: ${summary ? "Yes" : "No"}`
-  );
+  return true;
+}
+
+async function processInParallel<T, R>(
+  items: T[],
+  fn: (item: T) => Promise<R>,
+  concurrency: number
+): Promise<R[]> {
+  const results: R[] = [];
+
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchResults = await Promise.all(batch.map(fn));
+    results.push(...batchResults);
+
+    if (i + concurrency < items.length) {
+      // Brief pause between batches
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+
+  return results;
 }
 
 async function main() {
-  console.log("Starting content extraction...\n");
+  console.log("Starting optimized content extraction...");
+  console.log(`Using model: ${MODEL}, concurrency: ${CONCURRENCY}\n`);
 
-  let processed = 0;
+  let totalProcessed = 0;
 
   while (true) {
     const episodes = await getEpisodesNeedingExtraction();
@@ -269,18 +224,25 @@ async function main() {
       break;
     }
 
-    for (const episode of episodes) {
-      await processEpisode(episode);
-      processed++;
+    console.log(`Processing batch of ${episodes.length} episodes...`);
 
-      // Rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
+    const results = await processInParallel(
+      episodes,
+      async (ep) => {
+        const success = await processEpisode(ep);
+        process.stdout.write(success ? "." : "x");
+        return success;
+      },
+      CONCURRENCY
+    );
 
-    console.log(`\nProcessed ${processed} episodes so far...`);
+    const succeeded = results.filter(Boolean).length;
+    totalProcessed += succeeded;
+    console.log(`\n  Batch done: ${succeeded}/${episodes.length} succeeded`);
+    console.log(`  Total processed: ${totalProcessed}\n`);
   }
 
-  console.log(`\nExtraction complete! Total processed: ${processed}`);
+  console.log(`\nExtraction complete! Total: ${totalProcessed}`);
 }
 
 main().catch(console.error);

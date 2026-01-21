@@ -9,6 +9,9 @@
  * 5. Chunks transcripts for RAG
  */
 
+import * as dotenv from "dotenv";
+dotenv.config();
+
 import { createClient } from "@supabase/supabase-js";
 import * as fs from "fs";
 import * as path from "path";
@@ -16,8 +19,14 @@ import { execSync } from "child_process";
 import matter from "gray-matter";
 
 // Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !serviceRoleKey) {
+  console.error("Missing environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+  process.exit(1);
+}
+
 const supabase = createClient(supabaseUrl, serviceRoleKey);
 
 const REPO_URL = "https://github.com/ChatPRD/lennys-podcast-transcripts.git";
@@ -27,8 +36,11 @@ interface TranscriptFrontmatter {
   guest: string;
   title: string;
   youtube_url: string;
+  video_id?: string;
   publish_date: string;
-  duration: string;
+  description?: string;
+  duration_seconds?: number;
+  duration?: string;
   view_count?: number;
   keywords?: string[];
 }
@@ -80,34 +92,52 @@ async function parseTranscripts(): Promise<
 > {
   console.log("Parsing transcript files...");
 
-  const transcriptsDir = path.join(DATA_DIR, "transcripts");
-  if (!fs.existsSync(transcriptsDir)) {
-    // Try root directory if transcripts folder doesn't exist
-    const files = fs.readdirSync(DATA_DIR).filter((f) => f.endsWith(".md"));
-    return files.map((filename) => {
-      const filepath = path.join(DATA_DIR, filename);
-      const fileContent = fs.readFileSync(filepath, "utf-8");
-      const { data, content } = matter(fileContent);
-      return {
-        frontmatter: data as TranscriptFrontmatter,
-        content,
-        filename,
-      };
-    });
+  const episodesDir = path.join(DATA_DIR, "episodes");
+  const transcripts: Array<{
+    frontmatter: TranscriptFrontmatter;
+    content: string;
+    filename: string;
+  }> = [];
+
+  if (!fs.existsSync(episodesDir)) {
+    console.error("Episodes directory not found:", episodesDir);
+    return [];
   }
 
-  const files = fs.readdirSync(transcriptsDir).filter((f) => f.endsWith(".md"));
-
-  return files.map((filename) => {
-    const filepath = path.join(transcriptsDir, filename);
-    const fileContent = fs.readFileSync(filepath, "utf-8");
-    const { data, content } = matter(fileContent);
-    return {
-      frontmatter: data as TranscriptFrontmatter,
-      content,
-      filename,
-    };
+  // Each subdirectory in episodes/ is a guest folder containing transcript.md
+  const guestFolders = fs.readdirSync(episodesDir).filter((f) => {
+    const fullPath = path.join(episodesDir, f);
+    return fs.statSync(fullPath).isDirectory();
   });
+
+  for (const guestFolder of guestFolders) {
+    const transcriptPath = path.join(episodesDir, guestFolder, "transcript.md");
+
+    if (!fs.existsSync(transcriptPath)) {
+      continue;
+    }
+
+    try {
+      const fileContent = fs.readFileSync(transcriptPath, "utf-8");
+      const { data, content } = matter(fileContent);
+
+      // Skip if missing required fields
+      if (!data.guest || !data.title) {
+        console.log(`Skipping ${guestFolder}: missing guest or title`);
+        continue;
+      }
+
+      transcripts.push({
+        frontmatter: data as TranscriptFrontmatter,
+        content,
+        filename: `${guestFolder}/transcript.md`,
+      });
+    } catch (err) {
+      console.error(`Error parsing ${transcriptPath}:`, err);
+    }
+  }
+
+  return transcripts;
 }
 
 async function upsertGuest(guestName: string): Promise<string> {
@@ -171,8 +201,13 @@ async function insertEpisode(
     return existing.id;
   }
 
-  const videoId = extractVideoId(frontmatter.youtube_url);
-  const durationSeconds = parseDuration(frontmatter.duration || "0:00");
+  // Use video_id from frontmatter if available, otherwise extract from URL
+  const videoId = frontmatter.video_id || extractVideoId(frontmatter.youtube_url);
+
+  // Use duration_seconds from frontmatter if available, otherwise parse duration string
+  const durationSeconds = frontmatter.duration_seconds
+    ? Math.round(frontmatter.duration_seconds)
+    : parseDuration(frontmatter.duration || "0:00");
 
   const { data: episode, error } = await supabase
     .from("episodes")
@@ -182,6 +217,7 @@ async function insertEpisode(
       youtube_url: frontmatter.youtube_url,
       video_id: videoId,
       publish_date: frontmatter.publish_date,
+      description: frontmatter.description || null,
       duration_seconds: durationSeconds,
       view_count: frontmatter.view_count || 0,
       keywords: frontmatter.keywords || [],

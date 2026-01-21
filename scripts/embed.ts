@@ -5,19 +5,29 @@
  * text-embedding-3-small model and stores them in Supabase.
  */
 
+import * as dotenv from "dotenv";
+dotenv.config();
+
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 
 // Initialize clients
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const openaiKey = process.env.OPENAI_API_KEY;
+
+if (!supabaseUrl || !serviceRoleKey || !openaiKey) {
+  console.error("Missing environment variables. Please set NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and OPENAI_API_KEY in .env.local");
+  process.exit(1);
+}
+
 const supabase = createClient(supabaseUrl, serviceRoleKey);
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+  apiKey: openaiKey,
 });
 
-const BATCH_SIZE = 100; // Process 100 chunks at a time
+const BATCH_SIZE = 50; // Process 50 chunks at a time
 const EMBEDDING_MODEL = "text-embedding-3-small";
 
 async function getChunksWithoutEmbeddings(): Promise<
@@ -36,19 +46,21 @@ async function getChunksWithoutEmbeddings(): Promise<
   return data || [];
 }
 
-async function generateEmbeddings(
-  texts: string[]
-): Promise<Array<number[] | null>> {
+async function generateEmbedding(text: string): Promise<number[] | null> {
   try {
+    // Truncate text if too long (rough estimate: 4 chars per token, limit is ~8000 tokens)
+    const maxChars = 30000;
+    const truncatedText = text.length > maxChars ? text.slice(0, maxChars) : text;
+
     const response = await openai.embeddings.create({
       model: EMBEDDING_MODEL,
-      input: texts,
+      input: truncatedText,
     });
 
-    return response.data.map((item) => item.embedding);
+    return response.data[0].embedding;
   } catch (error) {
-    console.error("Error generating embeddings:", error);
-    return texts.map(() => null);
+    console.error("Error generating embedding:", (error as Error).message);
+    return null;
   }
 }
 
@@ -109,21 +121,23 @@ async function main() {
 
     console.log(`Processing batch of ${chunks.length} chunks...`);
 
-    // Generate embeddings
-    const texts = chunks.map((c) => c.content);
-    const embeddings = await generateEmbeddings(texts);
-
-    // Filter out failures and prepare updates
+    // Process each chunk individually to avoid token limits
     const updates: Array<{ id: string; embedding: number[] }> = [];
-    for (let i = 0; i < chunks.length; i++) {
-      if (embeddings[i]) {
+
+    for (const chunk of chunks) {
+      const embedding = await generateEmbedding(chunk.content);
+
+      if (embedding) {
         updates.push({
-          id: chunks[i].id,
-          embedding: embeddings[i]!,
+          id: chunk.id,
+          embedding: embedding,
         });
       } else {
         errors++;
       }
+
+      // Small delay to avoid rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
     // Update database
@@ -132,8 +146,8 @@ async function main() {
 
     console.log(`  Processed: ${processed}, Errors: ${errors}`);
 
-    // Rate limiting - wait a bit between batches
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Brief pause between batches
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
 
   console.log(`\nEmbedding generation complete!`);
