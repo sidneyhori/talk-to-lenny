@@ -69,8 +69,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${caveat.variable} min-h-screen flex flex-col`}>
+      <head>
         <GoogleAnalytics />
+      </head>
+      <body className={`${caveat.variable} min-h-screen flex flex-col`}>
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
