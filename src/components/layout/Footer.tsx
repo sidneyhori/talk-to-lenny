@@ -30,6 +30,12 @@ export function Footer() {
             >
               Transcript Source
             </a>
+            <a
+              href="mailto:contact@aeonixtech.com"
+              className="text-muted hover:text-foreground"
+            >
+              Contact
+            </a>
           </div>
         </div>
         <div className="text-center text-sm text-muted mt-4">
