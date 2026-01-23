@@ -7,6 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Send, Loader2, MessageSquare, ExternalLink } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import DOMPurify from "isomorphic-dompurify";
+
+// Sanitize content before rendering to prevent XSS
+function sanitizeContent(content: string): string {
+  return DOMPurify.sanitize(content, {
+    ALLOWED_TAGS: ["p", "strong", "em", "ul", "ol", "li", "code", "pre", "br", "a", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote"],
+    ALLOWED_ATTR: ["href", "target", "rel"],
+  });
+}
 
 interface Source {
   episodeId: string;
@@ -190,7 +199,7 @@ export default function ChatPage() {
                   <div className="space-y-4">
                     <div className="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-1 prose-strong:text-foreground prose-headings:text-foreground">
                       {message.content ? (
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                        <ReactMarkdown>{sanitizeContent(message.content)}</ReactMarkdown>
                       ) : (
                         <span className="flex items-center gap-2 text-muted">
                           <Loader2 className="h-4 w-4 animate-spin" />

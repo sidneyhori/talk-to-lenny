@@ -5,6 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import DOMPurify from "isomorphic-dompurify";
+
+// Sanitize content before rendering to prevent XSS
+function sanitizeContent(content: string): string {
+  return DOMPurify.sanitize(content, {
+    ALLOWED_TAGS: ["p", "strong", "em", "ul", "ol", "li", "code", "pre", "br", "a", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote"],
+    ALLOWED_ATTR: ["href", "target", "rel"],
+  });
+}
 
 interface Message {
   role: "user" | "assistant";
@@ -123,7 +132,7 @@ export function PodcastChat({ episodeId }: PodcastChatProps) {
               message.content
             ) : message.content ? (
               <div className="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-strong:text-foreground">
-                <ReactMarkdown>{message.content}</ReactMarkdown>
+                <ReactMarkdown>{sanitizeContent(message.content)}</ReactMarkdown>
               </div>
             ) : (
               <span className="flex items-center gap-2 text-muted text-sm">

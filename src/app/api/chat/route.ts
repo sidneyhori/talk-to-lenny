@@ -1,16 +1,16 @@
 import { createServerClient } from "@/lib/supabase";
 import { openai } from "@ai-sdk/openai";
 import { streamText } from "ai";
+import {
+  ChatRequestSchema,
+  escapeILikePattern,
+  checkRateLimit,
+  getClientIp,
+} from "@/lib/security";
 
 // Use Node.js runtime for better env var and database support
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-interface ChatRequest {
-  message: string;
-  episodeId?: string;
-  history?: Array<{ role: "user" | "assistant"; content: string }>;
-}
 
 async function getEmbedding(text: string): Promise<number[]> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -106,11 +106,14 @@ async function textSearchEpisodes(
   query: string,
   limit: number = 5
 ): Promise<EpisodeDetail[]> {
+  // Sanitize query to prevent injection
+  const sanitizedQuery = escapeILikePattern(query);
+
   // Try exact match first
   const { data: exactMatches } = await supabase
     .from("episodes")
     .select("id, title, slug, guest_name, summary")
-    .or(`title.ilike.%${query}%,guest_name.ilike.%${query}%`)
+    .or(`title.ilike.%${sanitizedQuery}%,guest_name.ilike.%${sanitizedQuery}%`)
     .limit(limit);
 
   if (exactMatches && exactMatches.length > 0) {
@@ -121,9 +124,10 @@ async function textSearchEpisodes(
   const words = query.split(/\s+/).filter(w => w.length > 2);
   if (words.length > 0) {
     // Search for any word matching (helps with "Jenn" matching "Jeanne")
-    const conditions = words.map(word =>
-      `guest_name.ilike.%${word}%,title.ilike.%${word}%`
-    ).join(',');
+    const conditions = words.map(word => {
+      const sanitizedWord = escapeILikePattern(word);
+      return `guest_name.ilike.%${sanitizedWord}%,title.ilike.%${sanitizedWord}%`;
+    }).join(',');
 
     const { data: partialMatches } = await supabase
       .from("episodes")
@@ -366,7 +370,26 @@ async function getFullEpisode(
 
 export async function POST(req: Request) {
   try {
-    const { message, episodeId, history = [] }: ChatRequest = await req.json();
+    // Rate limiting
+    const clientIp = getClientIp(req);
+    const rateLimit = checkRateLimit(`chat:${clientIp}`, 20, 60000);
+    if (!rateLimit.allowed) {
+      return new Response("Rate limit exceeded. Please try again later.", {
+        status: 429,
+        headers: {
+          "Retry-After": Math.ceil(rateLimit.resetIn / 1000).toString(),
+        },
+      });
+    }
+
+    // Validate request body
+    const body = await req.json();
+    const parseResult = ChatRequestSchema.safeParse(body);
+    if (!parseResult.success) {
+      return new Response("Invalid request format", { status: 400 });
+    }
+
+    const { message, episodeId, history } = parseResult.data;
     console.log(`Chat request: message="${message.slice(0, 50)}...", episodeId=${episodeId || 'none'}`);
 
     const supabase = createServerClient();
@@ -544,8 +567,9 @@ ${context}`;
       },
     });
   } catch (error) {
+    // Log detailed error server-side only
     console.error("Chat API error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return new Response(`Error: ${errorMessage}`, { status: 500 });
+    // Return generic error to client to prevent information disclosure
+    return new Response("An error occurred processing your request", { status: 500 });
   }
 }

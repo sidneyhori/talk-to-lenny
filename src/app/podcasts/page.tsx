@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PodcastFilters } from "./PodcastFilters";
 import { formatDuration, formatDate } from "@/lib/utils";
+import { escapeILikePattern } from "@/lib/security";
 
 // Strip markdown for clean text excerpts on cards
 function stripMarkdown(text: string): string {
@@ -51,9 +52,10 @@ async function getEpisodes(searchParams: SearchParams) {
     .from("episodes")
     .select("id, title, guest_name, slug, publish_date, duration_seconds, view_count, keywords, summary", { count: "exact" });
 
-  // Search filter
+  // Search filter - sanitize to prevent injection
   if (searchParams.q) {
-    query = query.or(`title.ilike.%${searchParams.q}%,guest_name.ilike.%${searchParams.q}%`);
+    const sanitizedQuery = escapeILikePattern(searchParams.q);
+    query = query.or(`title.ilike.%${sanitizedQuery}%,guest_name.ilike.%${sanitizedQuery}%`);
   }
 
   // Guest filter

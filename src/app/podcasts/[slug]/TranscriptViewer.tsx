@@ -5,6 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, ChevronDown, ChevronUp } from "lucide-react";
 
+// Escape special regex characters to prevent ReDoS attacks
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 interface TranscriptViewerProps {
   transcript: string;
 }
@@ -94,7 +99,9 @@ export function TranscriptViewer({ transcript }: TranscriptViewerProps) {
   const highlightSearch = (text: string) => {
     if (!search.trim()) return text;
 
-    const regex = new RegExp(`(${search})`, "gi");
+    // Escape special regex characters to prevent ReDoS
+    const escapedSearch = escapeRegExp(search);
+    const regex = new RegExp(`(${escapedSearch})`, "gi");
     const parts = text.split(regex);
 
     return parts.map((part, i) =>
