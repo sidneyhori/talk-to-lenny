@@ -100,16 +100,16 @@ export default async function PodcastPage({
   );
 
   return (
-    <div className="max-w-content mx-auto px-[3vw] py-12">
+    <div className="max-w-content mx-auto px-4 sm:px-6 lg:px-[3vw] py-8 sm:py-12">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6 sm:mb-8">
         <Link
           href="/podcasts"
           className="text-sm text-muted hover:text-foreground mb-4 inline-block"
         >
           &larr; Back to Podcasts
         </Link>
-        <h1 className="text-3xl font-bold mb-3">{episode.title}</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-3">{episode.title}</h1>
         <div className="flex flex-wrap items-center gap-4 text-sm text-muted mb-4">
           <Link
             href={`/guests/${slugify(episode.guest_name)}`}

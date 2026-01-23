@@ -110,7 +110,7 @@ function EpisodeCard({ episode }: { episode: {
 }}) {
   return (
     <Link href={`/podcasts/${episode.slug}`}>
-      <Card className="h-full hover:border-foreground/20 transition-colors">
+      <Card className="h-full">
         <CardHeader className="pb-3">
           <CardTitle className="text-base line-clamp-2">{episode.title}</CardTitle>
         </CardHeader>
@@ -140,7 +140,7 @@ function EpisodeCard({ episode }: { episode: {
 
 function LoadingSkeleton() {
   return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {[...Array(6)].map((_, i) => (
         <Card key={i}>
           <CardHeader>
@@ -170,10 +170,10 @@ export default async function PodcastsPage({
   ]);
 
   return (
-    <div className="max-w-content mx-auto px-[3vw] py-12">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Podcasts</h1>
-        <p className="text-muted">
+    <div className="max-w-content mx-auto px-4 sm:px-6 lg:px-[3vw] py-8 sm:py-12">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Podcasts</h1>
+        <p className="text-muted text-sm sm:text-base">
           Browse {total} episodes from Lenny&apos;s Podcast
         </p>
       </div>
@@ -181,7 +181,7 @@ export default async function PodcastsPage({
       <PodcastFilters guests={guests} currentParams={params} />
 
       <Suspense fallback={<LoadingSkeleton />}>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {episodes.map((episode) => (
             <EpisodeCard key={episode.id} episode={episode} />
           ))}
@@ -195,19 +195,19 @@ export default async function PodcastsPage({
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex justify-center gap-2 mt-8">
+          <div className="flex justify-center items-center gap-2 sm:gap-3 mt-8">
             {page > 1 && (
               <Link
                 href={{
                   pathname: "/podcasts",
                   query: { ...params, page: page - 1 },
                 }}
-                className="px-4 py-2 border border-border rounded-md hover:bg-card"
+                className="px-3 sm:px-4 py-2 border border-border rounded-lg hover:bg-card-hover transition-colors text-sm sm:text-base min-h-[44px] flex items-center"
               >
                 Previous
               </Link>
             )}
-            <span className="px-4 py-2 text-muted">
+            <span className="px-3 sm:px-4 py-2 text-muted text-sm sm:text-base">
               Page {page} of {totalPages}
             </span>
             {page < totalPages && (
@@ -216,7 +216,7 @@ export default async function PodcastsPage({
                   pathname: "/podcasts",
                   query: { ...params, page: page + 1 },
                 }}
-                className="px-4 py-2 border border-border rounded-md hover:bg-card"
+                className="px-3 sm:px-4 py-2 border border-border rounded-lg hover:bg-card-hover transition-colors text-sm sm:text-base min-h-[44px] flex items-center"
               >
                 Next
               </Link>

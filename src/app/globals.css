@@ -4,7 +4,12 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #000000;
+  --foreground: #0f0f0f;
+  --card: #faf8f5;
+  --card-hover: #f5f3f0;
+  --border: #e8e5e0;
+  --accent: #f97316;
+  --accent-muted: #fef7ed;
 }
 
 * {
@@ -40,16 +45,16 @@ a {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #faf8f5;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: #d4d0c8;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  background: #b8b4ac;
 }
 
 /* Custom utility classes */
@@ -129,7 +134,7 @@ a {
 }
 
 .prose blockquote {
-  border-left: 3px solid #e5e5e5;
+  border-left: 3px solid #e8e5e0;
   padding-left: 1em;
   margin-left: 0;
   font-style: italic;

@@ -119,11 +119,13 @@ export default async function HomePage() {
   ];
 
   return (
-    <div className="max-w-content mx-auto px-[3vw] py-12">
+    <div className="max-w-content mx-auto px-4 sm:px-6 lg:px-[3vw] py-12">
       {/* Hero Section */}
       <section className="text-center mb-16">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">Talk to Lenny</h1>
-        <p className="text-lg text-muted max-w-2xl mx-auto mb-8">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-4">
+          <span className="font-handwriting text-accent">Talk to Lenny</span>
+        </h1>
+        <p className="text-lg sm:text-xl text-muted max-w-2xl mx-auto mb-8">
           Explore insights from {stats.episodes} episodes of Lenny&apos;s Podcast.
           Search transcripts, chat with AI, and discover wisdom from world-class
           product leaders.
@@ -147,11 +149,11 @@ export default async function HomePage() {
           const Icon = stat.icon;
           return (
             <Link key={stat.label} href={stat.href}>
-              <Card className="hover:border-foreground/20 transition-colors">
+              <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-card rounded-md">
-                      <Icon className="h-5 w-5" />
+                    <div className="p-2 bg-accent-muted rounded-lg">
+                      <Icon className="h-5 w-5 text-accent" />
                     </div>
                     <div>
                       <p className="text-2xl font-bold">{stat.value}</p>
@@ -180,10 +182,10 @@ export default async function HomePage() {
             <Link href="/podcasts">View all</Link>
           </Button>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {recentEpisodes.map((episode) => (
             <Link key={episode.id} href={`/podcasts/${episode.slug}`}>
-              <Card className="h-full hover:border-foreground/20 transition-colors">
+              <Card className="h-full">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base line-clamp-2">
                     {episode.title}

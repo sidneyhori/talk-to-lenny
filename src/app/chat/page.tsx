@@ -140,35 +140,35 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-[3vw] py-12">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Chat with Lenny&apos;s Podcast</h1>
-        <p className="text-muted">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-[3vw] py-8 sm:py-12">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Chat with Lenny&apos;s Podcast</h1>
+        <p className="text-muted text-sm sm:text-base">
           Ask questions and get answers from 303 episodes of product and growth
           wisdom.
         </p>
       </div>
 
       {/* Chat container */}
-      <div className="border border-border rounded-lg flex flex-col h-[600px]">
+      <div className="border border-border rounded-xl shadow-sm flex flex-col h-[calc(100vh-200px)] sm:h-[calc(100vh-240px)] md:h-[600px]">
         {/* Messages area - scrollable */}
         <div className="flex-1 overflow-y-auto p-4">
           {messages.length === 0 && (
-            <div className="text-center py-16">
-              <MessageSquare className="h-12 w-12 mx-auto text-muted mb-4" />
-              <h2 className="text-xl font-medium mb-4">Start a conversation</h2>
-              <p className="text-muted mb-8 max-w-md mx-auto">
+            <div className="text-center py-8 sm:py-16 px-4">
+              <MessageSquare className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-muted mb-4" />
+              <h2 className="text-lg sm:text-xl font-medium mb-3 sm:mb-4">Start a conversation</h2>
+              <p className="text-muted text-sm sm:text-base mb-6 sm:mb-8 max-w-md mx-auto">
                 I can answer questions about product management, growth, leadership,
                 and more based on Lenny&apos;s podcast episodes.
               </p>
-              <div className="flex flex-wrap justify-center gap-2">
+              <div className="flex flex-col sm:flex-wrap sm:flex-row justify-center gap-2">
                 {EXAMPLE_QUESTIONS.map((question) => (
                   <Button
                     key={question}
                     variant="outline"
                     size="sm"
                     onClick={() => handleExampleClick(question)}
-                    className="text-sm"
+                    className="text-sm text-left sm:text-center"
                   >
                     {question}
                   </Button>

@@ -10,13 +10,14 @@ const config: Config = {
     extend: {
       colors: {
         background: "#ffffff",
-        foreground: "#1a1a1a",
-        card: "#fafafa",
-        border: "#e5e5e5",
+        foreground: "#0f0f0f",
+        card: "#faf8f5",
+        "card-hover": "#f5f3f0",
+        border: "#e8e5e0",
         muted: "#737373",
-        accent: "#f97316", // Lenny's orange
+        accent: "#f97316",
         "accent-hover": "#ea580c",
-        "accent-muted": "#fef3e2", // Muted peach/cream
+        "accent-muted": "#fef7ed",
       },
       maxWidth: {
         content: "1400px",
@@ -30,6 +31,7 @@ const config: Config = {
           "Roboto",
           "sans-serif",
         ],
+        handwriting: ["var(--font-handwriting)", "cursive"],
       },
     },
   },
