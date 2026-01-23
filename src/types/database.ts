@@ -179,6 +179,7 @@ export interface Database {
           id: string;
           title: string;
           author: string | null;
+          amazon_url: string | null;
           recommendation_count: number;
           recommenders: string[];
           created_at: string;
@@ -187,6 +188,7 @@ export interface Database {
           id?: string;
           title: string;
           author?: string | null;
+          amazon_url?: string | null;
           recommendation_count?: number;
           recommenders?: string[];
           created_at?: string;
@@ -195,6 +197,7 @@ export interface Database {
           id?: string;
           title?: string;
           author?: string | null;
+          amazon_url?: string | null;
           recommendation_count?: number;
           recommenders?: string[];
           created_at?: string;

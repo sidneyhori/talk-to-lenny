@@ -135,13 +135,20 @@ export function PodcastChat({ episodeId }: PodcastChatProps) {
                 <ReactMarkdown>{sanitizeContent(message.content)}</ReactMarkdown>
               </div>
             ) : (
-              <span className="flex items-center gap-2 text-muted text-sm">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Thinking...
-              </span>
+              <div className="flex items-center gap-2 text-muted text-sm py-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Thinking...</span>
+              </div>
             )}
           </div>
         ))}
+        {/* Show thinking indicator immediately after user sends message */}
+        {isLoading && messages.length > 0 && messages[messages.length - 1].role === "user" && (
+          <div className="flex items-center gap-2 text-muted text-sm py-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Thinking...</span>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 

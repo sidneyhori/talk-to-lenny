@@ -3,12 +3,14 @@ export const dynamic = "force-dynamic";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Users } from "lucide-react";
+import { BookOpen, Users, ExternalLink } from "lucide-react";
+import Link from "next/link";
 
 interface Book {
   id: string;
   title: string;
   author: string | null;
+  amazon_url: string | null;
   recommendation_count: number;
   recommenders: string[];
 }
@@ -55,14 +57,14 @@ export default async function BooksPage() {
       {/* Books grid */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {books.map((book) => (
-          <Card key={book.id} className="h-full">
+          <Card key={book.id} className="h-full flex flex-col">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-start gap-2">
                 <BookOpen className="h-5 w-5 mt-0.5 flex-shrink-0" />
                 <span>{book.title}</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 flex flex-col">
               {book.author && (
                 <p className="text-sm text-muted mb-3">by {book.author}</p>
               )}
@@ -78,7 +80,7 @@ export default async function BooksPage() {
                 </Badge>
               </div>
               {book.recommenders && book.recommenders.length > 0 && (
-                <div className="text-sm text-muted">
+                <div className="text-sm text-muted mb-3">
                   <p className="font-medium text-foreground text-xs mb-1">
                     Recommended by:
                   </p>
@@ -91,6 +93,19 @@ export default async function BooksPage() {
                       </span>
                     )}
                   </p>
+                </div>
+              )}
+              {book.amazon_url && (
+                <div className="mt-auto pt-3">
+                  <Link
+                    href={book.amazon_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    View on Amazon
+                  </Link>
                 </div>
               )}
             </CardContent>

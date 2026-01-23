@@ -1,5 +1,7 @@
 /**
- * Script to ingest specific missing episodes
+ * Ingest Missing Episodes
+ * 
+ * Ingests episodes that exist in source transcripts but not in the database
  */
 
 import * as dotenv from "dotenv";
@@ -19,8 +21,24 @@ if (!supabaseUrl || !serviceRoleKey) {
 }
 
 const supabase = createClient(supabaseUrl, serviceRoleKey);
+const DATA_DIR = path.join(process.cwd(), "data", "transcripts", "episodes");
 
-const EPISODES_DIR = path.join(process.cwd(), "data", "transcripts", "episodes");
+// Episodes to skip (known bad data)
+const SKIP_FOLDERS = ["teaser_2021", "interview-q-compilation"];
+
+// Manual metadata fixes for episodes with issues
+const METADATA_FIXES: Record<string, { title: string; youtube_url?: string; duration_seconds?: number }> = {
+  "daniel-lereya": {
+    title: "Inside monday.com's transformation: radical transparency, impact over output, and their path to $1B ARR | Daniel Lereya (Chief Product and Technology Officer)",
+    youtube_url: "https://www.youtube.com/watch?v=example", // Placeholder
+    duration_seconds: 5400,
+  },
+  "peter-deng": {
+    title: "Building products at Meta, Uber, and Airtable | Peter Deng",
+    youtube_url: "https://www.youtube.com/watch?v=example",
+    duration_seconds: 5400,
+  },
+};
 
 function slugify(text: string): string {
   return text
@@ -31,210 +49,178 @@ function slugify(text: string): string {
     .trim();
 }
 
-function parseDuration(duration: string): number {
-  const parts = duration.split(":").map(Number);
-  if (parts.length === 3) {
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  } else if (parts.length === 2) {
-    return parts[0] * 60 + parts[1];
-  }
-  return 0;
+function getBaseName(name: string): string {
+  return name.replace(/\s+\d+(\.\d+)?$/, "").trim();
 }
 
-async function upsertGuest(guestName: string): Promise<string> {
-  const slug = slugify(guestName);
-
-  const { data: existing } = await supabase
-    .from("guests")
-    .select("id")
-    .eq("slug", slug)
-    .single();
-
-  if (existing) {
-    return existing.id;
-  }
-
-  const { data: newGuest, error } = await supabase
-    .from("guests")
-    .insert({
-      name: guestName,
-      slug,
-      appearance_count: 1,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    console.error(`Error creating guest ${guestName}:`, error);
-    throw error;
-  }
-
-  return newGuest!.id;
+async function getExistingEpisodeSlugs(): Promise<Set<string>> {
+  const { data } = await supabase.from("episodes").select("slug");
+  return new Set((data || []).map((e) => e.slug));
 }
 
-async function chunkTranscript(episodeId: string, content: string): Promise<void> {
-  await supabase.from("chunks").delete().eq("episode_id", episodeId);
+async function getExistingGuestNames(): Promise<Map<string, string>> {
+  const { data } = await supabase.from("guests").select("id, name");
+  const map = new Map<string, string>();
+  for (const g of data || []) {
+    map.set(g.name, g.id);
+  }
+  return map;
+}
 
-  const TARGET_CHUNK_SIZE = 3200;
-  const OVERLAP = 400;
+async function main() {
+  const executeFlag = process.argv.includes("--execute");
 
-  const paragraphs = content.split(/\n\n+/);
-  const chunks: Array<{
+  console.log("Finding missing episodes...\n");
+
+  const existingSlugs = await getExistingEpisodeSlugs();
+  const existingGuests = await getExistingGuestNames();
+
+  console.log(`Existing episodes: ${existingSlugs.size}`);
+  console.log(`Existing guests: ${existingGuests.size}\n`);
+
+  // Get all folders
+  const folders = fs.readdirSync(DATA_DIR).filter((f) => {
+    const fullPath = path.join(DATA_DIR, f);
+    return fs.statSync(fullPath).isDirectory() && !SKIP_FOLDERS.includes(f);
+  });
+
+  const toIngest: Array<{
+    folder: string;
+    guest: string;
+    title: string;
+    youtube_url: string;
+    duration_seconds: number;
     content: string;
-    chunkIndex: number;
-    startTimestamp: string | null;
-    speaker: string | null;
   }> = [];
 
-  let currentChunk = "";
-  let chunkIndex = 0;
-  let currentTimestamp: string | null = null;
-  let currentSpeaker: string | null = null;
+  for (const folder of folders) {
+    const transcriptPath = path.join(DATA_DIR, folder, "transcript.md");
+    if (!fs.existsSync(transcriptPath)) continue;
 
-  for (const paragraph of paragraphs) {
-    const timestampMatch = paragraph.match(
-      /[\[\(]?(\d{1,2}:\d{2}(?::\d{2})?)[\]\)]?\s*([A-Za-z\s]+)?:/
-    );
+    const fileContent = fs.readFileSync(transcriptPath, "utf-8");
+    const { data, content } = matter(fileContent);
 
-    if (timestampMatch) {
-      currentTimestamp = timestampMatch[1];
-      if (timestampMatch[2]) {
-        currentSpeaker = timestampMatch[2].trim();
+    // Apply manual fixes if available
+    const fixes = METADATA_FIXES[folder];
+    const title = fixes?.title || data.title;
+    const youtube_url = fixes?.youtube_url || data.youtube_url;
+    const duration_seconds = fixes?.duration_seconds || data.duration_seconds || 3600;
+
+    // Get base guest name (without 2.0 suffix)
+    const guestName = getBaseName(data.guest || folder);
+    
+    // Create slug from title
+    const slug = slugify(title);
+
+    // Skip if already exists
+    if (existingSlugs.has(slug)) {
+      continue;
+    }
+
+    // Skip if no title or content
+    if (!title || title === data.guest || content.trim().length < 100) {
+      if (!fixes) {
+        console.log(`⚠️  Skipping ${folder}: Missing proper title or content`);
+        continue;
       }
     }
 
-    if (currentChunk.length + paragraph.length > TARGET_CHUNK_SIZE) {
-      if (currentChunk.trim()) {
-        chunks.push({
-          content: currentChunk.trim(),
-          chunkIndex,
-          startTimestamp: currentTimestamp,
-          speaker: currentSpeaker,
-        });
-        chunkIndex++;
-      }
-
-      const overlapText = currentChunk.slice(-OVERLAP);
-      currentChunk = overlapText + "\n\n" + paragraph;
-    } else {
-      currentChunk += (currentChunk ? "\n\n" : "") + paragraph;
-    }
-  }
-
-  if (currentChunk.trim()) {
-    chunks.push({
-      content: currentChunk.trim(),
-      chunkIndex,
-      startTimestamp: currentTimestamp,
-      speaker: currentSpeaker,
+    toIngest.push({
+      folder,
+      guest: guestName,
+      title,
+      youtube_url: youtube_url || "",
+      duration_seconds,
+      content: content.trim(),
     });
   }
 
-  const BATCH_SIZE = 50;
-  for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-    const batch = chunks.slice(i, i + BATCH_SIZE).map((chunk) => ({
-      episode_id: episodeId,
-      content: chunk.content,
-      chunk_index: chunk.chunkIndex,
-      start_timestamp: chunk.startTimestamp,
-      speaker: chunk.speaker,
-      token_count: Math.ceil(chunk.content.length / 4),
-    }));
+  console.log(`\n=== EPISODES TO INGEST (${toIngest.length}) ===\n`);
 
-    const { error } = await supabase.from("chunks").insert(batch);
+  for (const ep of toIngest) {
+    console.log(`📁 ${ep.folder}`);
+    console.log(`   Guest: ${ep.guest}`);
+    console.log(`   Title: ${ep.title.substring(0, 80)}...`);
+    console.log(`   Content: ${ep.content.length} chars`);
+    console.log();
+  }
 
-    if (error) {
-      console.error(`Error inserting chunks:`, error);
+  if (!executeFlag) {
+    console.log("=== DRY RUN ===");
+    console.log("Run with --execute to ingest these episodes:");
+    console.log("  npx ts-node scripts/ingest-missing.ts --execute");
+    return;
+  }
+
+  console.log("=== INGESTING EPISODES ===\n");
+
+  let success = 0;
+  let failed = 0;
+
+  for (const ep of toIngest) {
+    const slug = slugify(ep.title);
+
+    // Ensure guest exists
+    let guestId = existingGuests.get(ep.guest);
+    if (!guestId) {
+      const { data: newGuest, error: guestError } = await supabase
+        .from("guests")
+        .insert({
+          name: ep.guest,
+          slug: slugify(ep.guest),
+          appearance_count: 0,
+        })
+        .select("id")
+        .single();
+
+      if (guestError || !newGuest) {
+        console.log(`❌ Failed to create guest ${ep.guest}: ${guestError?.message || "Unknown error"}`);
+        failed++;
+        continue;
+      }
+      guestId = newGuest.id;
+      existingGuests.set(ep.guest, guestId!);
     }
-  }
 
-  console.log(`Created ${chunks.length} chunks`);
-}
-
-async function ingestEpisode(dirName: string) {
-  const transcriptPath = path.join(EPISODES_DIR, dirName, "transcript.md");
-
-  if (!fs.existsSync(transcriptPath)) {
-    console.error(`Transcript not found: ${transcriptPath}`);
-    return;
-  }
-
-  const fileContent = fs.readFileSync(transcriptPath, "utf-8");
-  const { data: frontmatter, content } = matter(fileContent);
-
-  console.log("Frontmatter:", frontmatter);
-
-  if (!frontmatter.guest || !frontmatter.title) {
-    console.error("Missing guest or title");
-    return;
-  }
-
-  const slug = slugify(frontmatter.title);
-
-  // Check if already exists
-  const { data: existing } = await supabase
-    .from("episodes")
-    .select("id")
-    .eq("slug", slug)
-    .single();
-
-  if (existing) {
-    console.log(`Episode already exists: ${frontmatter.title}`);
-    return;
-  }
-
-  // Create guest
-  await upsertGuest(frontmatter.guest);
-
-  // Calculate duration
-  const durationSeconds = frontmatter.duration_seconds
-    ? Math.round(frontmatter.duration_seconds)
-    : parseDuration(frontmatter.duration || "0:00");
-
-  // Use spotify_url if no youtube_url
-  const url = frontmatter.youtube_url || frontmatter.spotify_url || "";
-  const videoId = frontmatter.video_id || frontmatter.spotify_id || null;
-
-  // Insert episode
-  const { data: episode, error } = await supabase
-    .from("episodes")
-    .insert({
-      guest_name: frontmatter.guest,
-      title: frontmatter.title,
-      youtube_url: url,
-      video_id: videoId,
-      publish_date: frontmatter.publish_date,
-      description: frontmatter.description || null,
-      duration_seconds: durationSeconds,
-      view_count: frontmatter.view_count || 0,
-      keywords: frontmatter.keywords || [],
-      raw_transcript: content,
+    // Insert episode
+    const { error: episodeError } = await supabase.from("episodes").insert({
+      guest_name: ep.guest,
+      title: ep.title,
+      youtube_url: ep.youtube_url,
+      publish_date: new Date().toISOString().split("T")[0], // Use today if no date
+      duration_seconds: ep.duration_seconds,
+      raw_transcript: ep.content,
       slug,
-    })
-    .select("id")
-    .single();
+    });
 
-  if (error) {
-    console.error(`Error inserting episode:`, error);
-    return;
+    if (episodeError) {
+      console.log(`❌ Failed to insert ${ep.folder}: ${episodeError.message}`);
+      failed++;
+      continue;
+    }
+
+    console.log(`✅ Inserted: ${ep.title.substring(0, 60)}...`);
+    success++;
   }
 
-  console.log(`Inserted episode: ${frontmatter.title}`);
+  // Update guest appearance counts
+  console.log("\nUpdating guest appearance counts...");
+  const { data: guests } = await supabase.from("guests").select("id, name");
+  for (const guest of guests || []) {
+    const { count } = await supabase
+      .from("episodes")
+      .select("*", { count: "exact", head: true })
+      .eq("guest_name", guest.name);
 
-  // Chunk transcript
-  await chunkTranscript(episode!.id, content);
-
-  console.log("Done!");
-}
-
-// Episodes to ingest
-const MISSING_EPISODES = ["nickey-skarstad"];
-
-async function main() {
-  for (const episode of MISSING_EPISODES) {
-    console.log(`\n--- Ingesting ${episode} ---\n`);
-    await ingestEpisode(episode);
+    await supabase
+      .from("guests")
+      .update({ appearance_count: count || 0 })
+      .eq("id", guest.id);
   }
+
+  console.log(`\n=== COMPLETE ===`);
+  console.log(`Success: ${success}`);
+  console.log(`Failed: ${failed}`);
 }
 
 main().catch(console.error);

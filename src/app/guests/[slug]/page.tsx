@@ -123,7 +123,7 @@ export default async function GuestPage({
         {/* Episodes */}
         <div className="lg:col-span-2">
           <h2 className="text-xl font-semibold mb-4">Episodes</h2>
-          <div className="space-y-4">
+          <div className="space-y-6">
             {episodes.map((episode) => (
               <Link key={episode.id} href={`/podcasts/${episode.slug}`}>
                 <Card className="hover:border-foreground/20 transition-colors">

@@ -236,6 +236,19 @@ export default async function PodcastPage({
             </Card>
           )}
 
+          {/* Episode Chat - Mobile only (above transcript) */}
+          <Card className="lg:hidden">
+            <CardHeader>
+              <CardTitle className="text-base">Chat about this episode</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PodcastChat
+                episodeId={episode.id}
+                episodeTitle={episode.title}
+              />
+            </CardContent>
+          </Card>
+
           {/* Transcript */}
           <Card>
             <CardHeader>
@@ -247,8 +260,8 @@ export default async function PodcastPage({
           </Card>
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
+        {/* Sidebar - Desktop only */}
+        <div className="hidden lg:block space-y-6">
           {/* Episode Chat */}
           <Card className="sticky top-20">
             <CardHeader>
@@ -290,6 +303,34 @@ export default async function PodcastPage({
             </Card>
           )}
         </div>
+
+        {/* Related Episodes - Mobile only (after transcript) */}
+        {relatedEpisodes.length > 0 && (
+          <Card className="lg:hidden">
+            <CardHeader>
+              <CardTitle className="text-base">
+                More from {episode.guest_name}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3">
+                {relatedEpisodes.map((ep) => (
+                  <li key={ep.id}>
+                    <Link
+                      href={`/podcasts/${ep.slug}`}
+                      className="text-sm hover:underline line-clamp-2"
+                    >
+                      {ep.title}
+                    </Link>
+                    <p className="text-xs text-muted">
+                      {formatDate(ep.publish_date)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

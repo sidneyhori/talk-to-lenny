@@ -32,6 +32,19 @@ export function Footer() {
             </a>
           </div>
         </div>
+        <div className="text-center text-sm text-muted mt-4">
+          <p>
+            Built with 🧡 by{" "}
+            <a
+              href="https://aeonixtech.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-foreground"
+            >
+              Aeonix Tech
+            </a>
+          </p>
+        </div>
       </div>
     </footer>
   );

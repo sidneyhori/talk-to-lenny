@@ -201,10 +201,10 @@ export default function ChatPage() {
                       {message.content ? (
                         <ReactMarkdown>{sanitizeContent(message.content)}</ReactMarkdown>
                       ) : (
-                        <span className="flex items-center gap-2 text-muted">
+                        <div className="flex items-center gap-2 text-muted py-2">
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Searching transcripts...
-                        </span>
+                          <span>Searching transcripts...</span>
+                        </div>
                       )}
                     </div>
 
@@ -242,6 +242,13 @@ export default function ChatPage() {
                 )}
               </div>
             ))}
+            {/* Show thinking indicator immediately after user sends message */}
+            {isLoading && messages.length > 0 && messages[messages.length - 1].role === "user" && (
+              <div className="flex items-center gap-2 text-muted py-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Searching transcripts...</span>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
         </div>

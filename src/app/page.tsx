@@ -125,10 +125,13 @@ export default async function HomePage() {
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-4">
           <span className="font-handwriting text-accent">Talk to Lenny</span>
         </h1>
-        <p className="text-lg sm:text-xl text-muted max-w-2xl mx-auto mb-8">
+        <p className="text-lg sm:text-xl text-muted max-w-2xl mx-auto mb-2">
           Explore insights from {stats.episodes} episodes of Lenny&apos;s Podcast.
           Search transcripts, chat with AI, and discover wisdom from world-class
           product leaders.
+        </p>
+        <p className="text-sm text-muted italic mb-8">
+          unofficial non-commercial fan page
         </p>
         <div className="flex flex-wrap justify-center gap-4">
           <Button asChild size="lg">
