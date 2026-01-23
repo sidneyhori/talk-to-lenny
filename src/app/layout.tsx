@@ -13,7 +13,7 @@ const caveat = Caveat({
 export const metadata: Metadata = {
   title: "Talk to Lenny - Explore Lenny's Podcast",
   description:
-    "AI-powered exploration of Lenny Rachitsky's podcast transcripts. Chat with 303 episodes, discover insights, and visualize connections.",
+    "AI-powered exploration of Lenny Rachitsky's podcast transcripts. Chat with 270 episodes, discover insights, and visualize connections.",
   keywords: [
     "Lenny Rachitsky",
     "podcast",
@@ -33,6 +33,31 @@ export const metadata: Metadata = {
     other: [
       { rel: "manifest", url: "/site.webmanifest" },
     ],
+  },
+  metadataBase: new URL("https://www.talktolenny.com"),
+  openGraph: {
+    title: "Talk to Lenny - Explore Lenny's Podcast",
+    description:
+      "AI-powered exploration of Lenny Rachitsky's podcast transcripts. Chat with 270 episodes, discover insights, and visualize connections.",
+    url: "https://www.talktolenny.com",
+    siteName: "Talk to Lenny",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Talk to Lenny - AI-powered podcast exploration",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Talk to Lenny - Explore Lenny's Podcast",
+    description:
+      "AI-powered exploration of Lenny Rachitsky's podcast transcripts. Chat with 270 episodes, discover insights, and visualize connections.",
+    images: ["/og-image.png"],
   },
 };
 
